@@ -1,8 +1,10 @@
+#include <Servo.h>
 #include <I2Cdev.h>
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "Wire.h"
 
 MPU6050 mpu;
+Servo servo;
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -16,6 +18,8 @@ Quaternion q;           // [w, x, y, z]         quaternion container
 VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+float averageArray[10];
+int averageArraySize = 0;
 
 // ================================================================
 // ===               INTERRUPT DETECTION ROUTINE                ===
@@ -28,23 +32,73 @@ void dmpDataReady() {
 
 void setup(){
 	initMPU();
-
+	servo.attach(9);
+	servo.write(0);
+	delay(1000);
+	servo.write(180);
+	delay(1000);
+	servo.write(90);
 
 }
 
 void loop()
 {
 	calculateYPR();
-	//display ypr
+	//printYPR();//display ypr
+	//storePitch();
+	//float averagePitch = sum();
+	//servo.write(averagePitch);
+	setServoAngle();
+
+
+}
+
+void storePitch() {
+	if (averageArraySize < 10) {
+		averageArray[averageArraySize] = ypr[1];
+		averageArraySize++;
+	}
+	else {
+		averageArray[0] = 0;
+		shuffleDown();
+		averageArray[9] = ypr[1];
+	}
+
+}
+
+float sum() {
+	float averagePitch = 0;
+	for (int i = 0; i < 10; i++) {
+		averagePitch = averagePitch + averageArray[i];
+	}
+	return averagePitch;
+}
+
+void shuffleDown() {
+	for (int i = 0; i < 9; i++) {
+		averageArray[i] = averageArray[i + 1];
+	}
+}
+
+void setServoAngle() {
+	float pitch = ypr[1] * 180 / M_PI;
+	servo.write(pitch);
+}
+
+void printYPR(){
 	Serial.println("");
 	Serial.print("ypr\t");
 	for (int i = 0; i < 3; i++) {
 		Serial.print(ypr[i] * 180 / M_PI);
+		//writing to pitch to servo
+		if (i == 1) {
+			float pitch = ypr[i] * 180 / M_PI;
+			servo.write(pitch);
+		}
 		if (i != 2) {
 			Serial.print("\t");
 		}
 	}
-
 }
 
 void initMPU() {
